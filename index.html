@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>MIDI Input Soundboard</title>
+<title>MPK Mini Soundboard (Manual MIDI Assign)</title>
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -29,14 +29,14 @@
 
   .pad-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 15px;
     margin-top: 20px;
   }
 
   .pad {
     background: #333;
-    padding: 20px;
+    padding: 15px;
     border-radius: 10px;
     cursor: pointer;
     transition: transform 0.15s, background 0.15s;
@@ -71,17 +71,28 @@
     0% { width: 0; height: 0; opacity: 0.7; }
     100% { width: 200px; height: 200px; opacity: 0; }
   }
+
+  .note-input {
+    margin-top: 10px;
+    width: 60px;
+    padding: 5px;
+    font-size: 14px;
+    text-align: center;
+    border-radius: 6px;
+    border: none;
+  }
 </style>
 </head>
 <body>
 
-<h1>MIDI Input Soundboard</h1>
+<h1>MPK Mini Soundboard</h1>
 
 <div id="status">Connecting to MIDI…</div>
 
 <label for="channel-select">Listen on MIDI Channel:</label>
 <select id="channel-select">
-  <option value="0">Channel 1</option>
+  <option value="0">Channel 1 (Keys)</option>
+  <option value="9">Channel 10 (MPK Pads)</option>
   <option value="1">Channel 2</option>
   <option value="2">Channel 3</option>
   <option value="3">Channel 4</option>
@@ -90,7 +101,6 @@
   <option value="6">Channel 7</option>
   <option value="7">Channel 8</option>
   <option value="8">Channel 9</option>
-  <option value="9">Channel 10</option>
   <option value="10">Channel 11</option>
   <option value="11">Channel 12</option>
   <option value="12">Channel 13</option>
@@ -111,9 +121,8 @@
   const upload = document.getElementById("upload");
   const pads = document.getElementById("pads");
 
-  let padData = []; // store audio + element + midi note
+  let padData = [];
 
-  // MIDI INIT
   if (navigator.requestMIDIAccess) {
     navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
   } else {
@@ -140,7 +149,6 @@
       "Failed to access MIDI.";
   }
 
-  // Handle incoming MIDI
   function onMIDIMessage(msg) {
     const [status, note, velocity] = msg.data;
     const channel = status & 0x0F;
@@ -148,7 +156,6 @@
 
     const selectedChannel = parseInt(channelSelect.value);
 
-    // Only respond to Note On on selected channel
     if (channel === selectedChannel && type === 0x90 && velocity > 0) {
       triggerPadByNote(note);
     }
@@ -168,7 +175,6 @@
     setTimeout(() => element.classList.remove("pulse"), 500);
   }
 
-  // AUDIO + PADS
   upload.addEventListener("change", function () {
     pads.innerHTML = "";
     padData = [];
@@ -176,20 +182,37 @@
     Array.from(upload.files).forEach((file, index) => {
       const pad = document.createElement("div");
       pad.className = "pad";
-      pad.textContent = file.name;
+
+      const label = document.createElement("div");
+      label.textContent = file.name;
+
+      const noteInput = document.createElement("input");
+      noteInput.type = "number";
+      noteInput.min = 0;
+      noteInput.max = 127;
+      noteInput.value = 60 + index;
+      noteInput.className = "note-input";
 
       const audio = new Audio(URL.createObjectURL(file));
 
-      const midiNote = 60 + index; // C4 upward
+      pad.appendChild(label);
+      pad.appendChild(noteInput);
 
-      pad.addEventListener("click", () => triggerPadByNote(midiNote));
+      pad.addEventListener("click", () => {
+        triggerPadByNote(parseInt(noteInput.value));
+      });
 
       pads.appendChild(pad);
 
       padData.push({
-        midiNote,
+        midiNote: parseInt(noteInput.value),
         audio,
-        element: pad
+        element: pad,
+        input: noteInput
+      });
+
+      noteInput.addEventListener("change", () => {
+        padData[index].midiNote = parseInt(noteInput.value);
       });
     });
   });
