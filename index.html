@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Uploadable Soundboard</title>
+<title>MIDI + Audio Soundboard</title>
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -11,41 +11,124 @@
     text-align: center;
     padding: 20px;
   }
+
   #upload {
     margin-bottom: 20px;
   }
+
+  #status {
+    margin-bottom: 10px;
+    color: #ccc;
+  }
+
   .pad-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 15px;
     margin-top: 20px;
   }
+
   .pad {
     background: #333;
     padding: 20px;
     border-radius: 10px;
     cursor: pointer;
-    transition: 0.15s;
+    transition: transform 0.15s, background 0.15s;
+    position: relative;
+    overflow: hidden;
   }
-  .pad:hover {
-    background: #555;
+
+  .pad.active {
+    background: #ff9800;
+    transform: scale(1.08);
+  }
+
+  .pad::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 152, 0, 0.4);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .pad.pulse::after {
+    animation: pulse 0.5s ease-out;
+  }
+
+  @keyframes pulse {
+    0% {
+      width: 0;
+      height: 0;
+      opacity: 0.7;
+    }
+    100% {
+      width: 200px;
+      height: 200px;
+      opacity: 0;
+    }
   }
 </style>
 </head>
 <body>
 
-<h1>Soundboard – Upload Your Own Songs</h1>
+<h1>MIDI + Audio Soundboard</h1>
+
+<div id="status">Connecting to MIDI…</div>
 
 <input id="upload" type="file" accept="audio/*" multiple>
 
 <div class="pad-grid" id="pads"></div>
 
 <script>
+  let midiAccess = null;
+  let midiOutput = null;
+
+  // MIDI INIT
+  if (navigator.requestMIDIAccess) {
+    navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
+  } else {
+    document.getElementById("status").textContent =
+      "Web MIDI not supported in this browser.";
+  }
+
+  function onMIDISuccess(access) {
+    midiAccess = access;
+    const outputs = Array.from(access.outputs.values());
+    if (outputs.length > 0) {
+      midiOutput = outputs[0];
+      document.getElementById("status").textContent =
+        "Connected to MIDI output: " + midiOutput.name;
+    } else {
+      document.getElementById("status").textContent =
+        "No MIDI output found.";
+    }
+  }
+
+  function onMIDIFailure() {
+    document.getElementById("status").textContent =
+      "Failed to access MIDI.";
+  }
+
+  function sendNoteOn(note, velocity = 100) {
+    if (midiOutput) midiOutput.send([0x90, note, velocity]);
+  }
+
+  function sendNoteOff(note) {
+    if (midiOutput) midiOutput.send([0x80, note, 0]);
+  }
+
+  // AUDIO + PADS
   const upload = document.getElementById("upload");
   const pads = document.getElementById("pads");
 
   upload.addEventListener("change", function () {
-    pads.innerHTML = ""; // Clear old pads
+    pads.innerHTML = "";
 
     Array.from(upload.files).forEach((file, index) => {
       const pad = document.createElement("div");
@@ -54,9 +137,18 @@
 
       const audio = new Audio(URL.createObjectURL(file));
 
+      const midiNote = 60 + index; // C4 upward
+
       pad.addEventListener("click", () => {
         audio.currentTime = 0;
         audio.play();
+
+        sendNoteOn(midiNote);
+        setTimeout(() => sendNoteOff(midiNote), 200);
+
+        pad.classList.add("active", "pulse");
+        setTimeout(() => pad.classList.remove("active"), 150);
+        setTimeout(() => pad.classList.remove("pulse"), 500);
       });
 
       pads.appendChild(pad);
