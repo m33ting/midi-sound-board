@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>MIDI + Audio Soundboard (Channel Select)</title>
+<title>MIDI Input Soundboard</title>
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -68,26 +68,18 @@
   }
 
   @keyframes pulse {
-    0% {
-      width: 0;
-      height: 0;
-      opacity: 0.7;
-    }
-    100% {
-      width: 200px;
-      height: 200px;
-      opacity: 0;
-    }
+    0% { width: 0; height: 0; opacity: 0.7; }
+    100% { width: 200px; height: 200px; opacity: 0; }
   }
 </style>
 </head>
 <body>
 
-<h1>MIDI + Audio Soundboard</h1>
+<h1>MIDI Input Soundboard</h1>
 
 <div id="status">Connecting to MIDI…</div>
 
-<label for="channel-select">MIDI Channel:</label>
+<label for="channel-select">Listen on MIDI Channel:</label>
 <select id="channel-select">
   <option value="0">Channel 1</option>
   <option value="1">Channel 2</option>
@@ -113,9 +105,13 @@
 
 <script>
   let midiAccess = null;
-  let midiOutput = null;
+  let midiInput = null;
 
   const channelSelect = document.getElementById("channel-select");
+  const upload = document.getElementById("upload");
+  const pads = document.getElementById("pads");
+
+  let padData = []; // store audio + element + midi note
 
   // MIDI INIT
   if (navigator.requestMIDIAccess) {
@@ -127,14 +123,15 @@
 
   function onMIDISuccess(access) {
     midiAccess = access;
-    const outputs = Array.from(access.outputs.values());
-    if (outputs.length > 0) {
-      midiOutput = outputs[0];
+    const inputs = Array.from(access.inputs.values());
+    if (inputs.length > 0) {
+      midiInput = inputs[0];
+      midiInput.onmidimessage = onMIDIMessage;
       document.getElementById("status").textContent =
-        "Connected to MIDI output: " + midiOutput.name;
+        "Listening to MIDI input: " + midiInput.name;
     } else {
       document.getElementById("status").textContent =
-        "No MIDI output found.";
+        "No MIDI input found.";
     }
   }
 
@@ -143,26 +140,38 @@
       "Failed to access MIDI.";
   }
 
-  function sendNoteOn(note, velocity = 100) {
-    if (midiOutput) {
-      const channel = parseInt(channelSelect.value);
-      midiOutput.send([0x90 + channel, note, velocity]);
+  // Handle incoming MIDI
+  function onMIDIMessage(msg) {
+    const [status, note, velocity] = msg.data;
+    const channel = status & 0x0F;
+    const type = status & 0xF0;
+
+    const selectedChannel = parseInt(channelSelect.value);
+
+    // Only respond to Note On on selected channel
+    if (channel === selectedChannel && type === 0x90 && velocity > 0) {
+      triggerPadByNote(note);
     }
   }
 
-  function sendNoteOff(note) {
-    if (midiOutput) {
-      const channel = parseInt(channelSelect.value);
-      midiOutput.send([0x80 + channel, note, 0]);
-    }
+  function triggerPadByNote(note) {
+    const padObj = padData.find(p => p.midiNote === note);
+    if (!padObj) return;
+
+    const { audio, element } = padObj;
+
+    audio.currentTime = 0;
+    audio.play();
+
+    element.classList.add("active", "pulse");
+    setTimeout(() => element.classList.remove("active"), 150);
+    setTimeout(() => element.classList.remove("pulse"), 500);
   }
 
   // AUDIO + PADS
-  const upload = document.getElementById("upload");
-  const pads = document.getElementById("pads");
-
   upload.addEventListener("change", function () {
     pads.innerHTML = "";
+    padData = [];
 
     Array.from(upload.files).forEach((file, index) => {
       const pad = document.createElement("div");
@@ -173,19 +182,15 @@
 
       const midiNote = 60 + index; // C4 upward
 
-      pad.addEventListener("click", () => {
-        audio.currentTime = 0;
-        audio.play();
-
-        sendNoteOn(midiNote);
-        setTimeout(() => sendNoteOff(midiNote), 200);
-
-        pad.classList.add("active", "pulse");
-        setTimeout(() => pad.classList.remove("active"), 150);
-        setTimeout(() => pad.classList.remove("pulse"), 500);
-      });
+      pad.addEventListener("click", () => triggerPadByNote(midiNote));
 
       pads.appendChild(pad);
+
+      padData.push({
+        midiNote,
+        audio,
+        element: pad
+      });
     });
   });
 </script>
