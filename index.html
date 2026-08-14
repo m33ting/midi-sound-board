@@ -1,136 +1,68 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>MIDI Soundboard</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background: #111;
-      color: #eee;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
-    }
-    #status {
-      margin-bottom: 20px;
-    }
-    .pad-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 120px);
-      gap: 15px;
-    }
-    .pad {
-      width: 120px;
-      height: 120px;
-      border-radius: 12px;
-      background: #333;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      user-select: none;
-      transition: background 0.15s, transform 0.1s;
-    }
-    .pad.active {
-      background: #ff9800;
-      transform: scale(0.96);
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Uploadable Soundboard</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: #eee;
+    text-align: center;
+    padding: 20px;
+  }
+  #upload {
+    margin-bottom: 20px;
+  }
+  .pad-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+  }
+  .pad {
+    background: #333;
+    padding: 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  .pad:hover {
+    background: #555;
+  }
+</style>
 </head>
 <body>
-  <h1>MIDI Soundboard</h1>
-  <div id="status">Initializing Web MIDI…</div>
 
-  <div class="pad-grid">
-    <div class="pad" data-note="60">C4</div>
-    <div class="pad" data-note="62">D4</div>
-    <div class="pad" data-note="64">E4</div>
-    <div class="pad" data-note="65">F4</div>
-    <div class="pad" data-note="67">G4</div>
-    <div class="pad" data-note="69">A4</div>
-    <div class="pad" data-note="71">B4</div>
-    <div class="pad" data-note="72">C5</div>
-  </div>
+<h1>Soundboard – Upload Your Own Songs</h1>
 
-  <script>
-    let midiAccess = null;
-    let output = null;
+<input id="upload" type="file" accept="audio/*" multiple>
 
-    function setStatus(msg) {
-      document.getElementById('status').textContent = msg;
-    }
+<div class="pad-grid" id="pads"></div>
 
-    // Request MIDI access
-    if (navigator.requestMIDIAccess) {
-      navigator.requestMIDIAccess()
-        .then(onMIDISuccess, onMIDIFailure);
-    } else {
-      setStatus('Web MIDI API not supported in this browser.');
-    }
+<script>
+  const upload = document.getElementById("upload");
+  const pads = document.getElementById("pads");
 
-    function onMIDISuccess(access) {
-      midiAccess = access;
-      const outputs = Array.from(midiAccess.outputs.values());
-      if (outputs.length === 0) {
-        setStatus('No MIDI outputs found. Connect a synth or virtual MIDI device.');
-        return;
-      }
-      output = outputs[0];
-      setStatus('Connected to MIDI output: ' + output.name);
-      setupPads();
-    }
+  upload.addEventListener("change", function () {
+    pads.innerHTML = ""; // Clear old pads
 
-    function onMIDIFailure() {
-      setStatus('Could not access MIDI devices.');
-    }
+    Array.from(upload.files).forEach((file, index) => {
+      const pad = document.createElement("div");
+      pad.className = "pad";
+      pad.textContent = file.name;
 
-    function noteOn(note, velocity = 100, channel = 0) {
-      if (!output) return;
-      const status = 0x90 + channel; // Note On
-      output.send([status, note, velocity]);
-    }
+      const audio = new Audio(URL.createObjectURL(file));
 
-    function noteOff(note, channel = 0) {
-      if (!output) return;
-      const status = 0x80 + channel; // Note Off
-      output.send([status, note, 0]);
-    }
-
-    function setupPads() {
-      const pads = document.querySelectorAll('.pad');
-      pads.forEach(pad => {
-        const note = parseInt(pad.dataset.note, 10);
-
-        // Mouse events
-        pad.addEventListener('mousedown', () => {
-          pad.classList.add('active');
-          noteOn(note);
-        });
-        pad.addEventListener('mouseup', () => {
-          pad.classList.remove('active');
-          noteOff(note);
-        });
-        pad.addEventListener('mouseleave', () => {
-          pad.classList.remove('active');
-          noteOff(note);
-        });
-
-        // Touch events (mobile)
-        pad.addEventListener('touchstart', (e) => {
-          e.preventDefault();
-          pad.classList.add('active');
-          noteOn(note);
-        }, { passive: false });
-
-        pad.addEventListener('touchend', (e) => {
-          e.preventDefault();
-          pad.classList.remove('active');
-          noteOff(note);
-        }, { passive: false });
+      pad.addEventListener("click", () => {
+        audio.currentTime = 0;
+        audio.play();
       });
-    }
-  </script>
+
+      pads.appendChild(pad);
+    });
+  });
+</script>
+
 </body>
 </html>
