@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>MIDI + Audio Soundboard</title>
+<title>MIDI + Audio Soundboard (Channel Select)</title>
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -19,6 +19,12 @@
   #status {
     margin-bottom: 10px;
     color: #ccc;
+  }
+
+  #channel-select {
+    margin: 10px;
+    padding: 8px;
+    font-size: 16px;
   }
 
   .pad-grid {
@@ -81,6 +87,26 @@
 
 <div id="status">Connecting to MIDI…</div>
 
+<label for="channel-select">MIDI Channel:</label>
+<select id="channel-select">
+  <option value="0">Channel 1</option>
+  <option value="1">Channel 2</option>
+  <option value="2">Channel 3</option>
+  <option value="3">Channel 4</option>
+  <option value="4">Channel 5</option>
+  <option value="5">Channel 6</option>
+  <option value="6">Channel 7</option>
+  <option value="7">Channel 8</option>
+  <option value="8">Channel 9</option>
+  <option value="9">Channel 10</option>
+  <option value="10">Channel 11</option>
+  <option value="11">Channel 12</option>
+  <option value="12">Channel 13</option>
+  <option value="13">Channel 14</option>
+  <option value="14">Channel 15</option>
+  <option value="15">Channel 16</option>
+</select>
+
 <input id="upload" type="file" accept="audio/*" multiple>
 
 <div class="pad-grid" id="pads"></div>
@@ -88,6 +114,8 @@
 <script>
   let midiAccess = null;
   let midiOutput = null;
+
+  const channelSelect = document.getElementById("channel-select");
 
   // MIDI INIT
   if (navigator.requestMIDIAccess) {
@@ -116,11 +144,17 @@
   }
 
   function sendNoteOn(note, velocity = 100) {
-    if (midiOutput) midiOutput.send([0x90, note, velocity]);
+    if (midiOutput) {
+      const channel = parseInt(channelSelect.value);
+      midiOutput.send([0x90 + channel, note, velocity]);
+    }
   }
 
   function sendNoteOff(note) {
-    if (midiOutput) midiOutput.send([0x80, note, 0]);
+    if (midiOutput) {
+      const channel = parseInt(channelSelect.value);
+      midiOutput.send([0x80 + channel, note, 0]);
+    }
   }
 
   // AUDIO + PADS
